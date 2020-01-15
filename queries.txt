@@ -1,0 +1,67 @@
+Q1: (select season, toss_winner, count(toss_winner) from matches
+        where toss_decision="field" and season in (2016)
+        group by season, toss_winner
+        order by season desc, count(toss_winner) desc
+        limit 4)
+        UNION
+        (select season, toss_winner, count(toss_winner) from matches
+        where toss_decision="field" and season in (2017)
+        group by season, toss_winner
+        order by season desc, count(toss_winner) desc
+        limit 4)
+
+Q2:
+
+        create view fours as
+        select m.season, d.batting_team, count(d.batting_team) as fours from deliveries d
+        inner join matches m on m.MATCH_ID=d.MATCH_ID where d.batsman_runs=4
+        group by m.season, d.batting_team;
+
+        create view sixes as
+        select m.season, d.batting_team, count(d.batting_team) as sixes from deliveries d
+        inner join matches m on m.MATCH_ID=d.MATCH_ID where d.batsman_runs=6
+        group by m.season, d.batting_team;
+
+        create view total_score as
+        select m.season, d.batting_team, sum(d.total_runs) as total_runs from deliveries d
+        inner join matches m on m.MATCH_ID=d.MATCH_ID
+        group by m.season, d.batting_team;
+
+
+        select t.season, t.batting_team, f.fours,s.sixes, t.total_runs from total_score t
+        inner join fours f on f.batting_team=t.batting_team AND f.season=t.season
+        inner join sixes s on s.batting_team=t.batting_team AND s.season=t.season
+        order by t.season desc;
+
+Q3:
+
+        select m.season, d.bowler,(sum(d.total_runs)-(sum(d.legbye_runs)+sum(d.bye_runs)))/(count(d.bowler)/6) as economy from deliveries d
+        inner join matches m on m.match_id=d.match_id
+        group by m.season, d.bowler
+        having (count(d.bowler)/6) >= 10
+        order by economy asc limit 5;
+
+
+        create view economy as (select m.season, d.bowler,(sum(d.total_runs)-(sum(d.legbye_runs)+sum(d.bye_runs)))/(count(d.bowler)/6) as economy from deliveries d
+        inner join matches m on m.match_id=d.match_id
+        group by m.season, d.bowler
+        having (count(d.bowler)/6) >= 10
+        order by economy asc);
+
+        select T.season, T.bowler, T.economy from (select T.season, T.bowler, T.economy,
+        row_number() over(partition by T.season order by T.economy asc) as rn
+        from economy as T) as T
+        where T.rn <= 10
+
+Q4:
+        CREATE view v_bowl AS SELECT m.MATCH_ID,m.DATE, m.SEASON, d.BOWLING_TEAM, SUM(d.TOTAL_RUNS) as Runs, FLOOR(COUNT(d.BOWLER)/6) as Bowls FROM deliveries d INNER JOIN matches m ON m.MATCH_ID = d.MATCH_ID GROUP BY m.SEASON,m.MATCH_ID, d.BOWLING_TEAM;
+
+        CREATE view v_bat AS SELECT m.MATCH_ID,m.DATE, m.SEASON, d.BATTING_TEAM, SUM(d.TOTAL_RUNS) as Runs, FLOOR(COUNT(d.BOWLER)/6) as Bowls FROM deliveries d INNER JOIN matches m ON m.MATCH_ID = d.MATCH_ID GROUP BY m.SEASON,m.MATCH_ID, d.BATTING_TEAM;
+
+        CREATE view v_nrr as SELECT v1.SEASON, v1.DATE, v1.BATTING_TEAM as Team, AVG((v1.Runs/v1.Bowls)-(v2.Runs/v2.Bowls)) as NET_RUN_RATE FROM v_bat v1 INNER JOIN v_bowl v2 ON v1.BATTING_TEAM = v2.BOWLING_TEAM GROUP BY v1.SEASON, v1.Date, v1.BATTING_TEAM;
+
+        SELECT season,team FROM v_nrr WHERE NET_RUN_RATE = ANY(SELECT MAX(NET_RUN_RATE) FROM v_nrr GROUP BY SEASON) ORDER BY SEASON;
+
+Q5:
+        SELECT team FROM v_nrr WHERE NET_RUN_RATE = ANY(SELECT MAX(NET_RUN_RATE) FROM v_nrr where month(date)=4 GROUP BY SEASON) ORDER BY NET_RUN_RATE DESC limit 1;
+
